@@ -11,6 +11,10 @@ spec:
     - protocol: TCP
       port: 8081
       targetPort: 8081
+  template:
+    spec:
+      containers:
+        - image: enterprisegroupprojectregistry.azurecr.io/product_service:d936e92572b37168551879fb4a6b9052d9e53982
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -29,7 +33,7 @@ spec:
     spec:
       containers:
         - name: product-service-container
-          image: enterprisegroupprojectregistry.azurecr.io/product-service:latest
+          image: enterprisegroupprojectregistry.azurecr.io/product_service:d936e92572b37168551879fb4a6b9052d9e53982
           imagePullPolicy: Always
           ports:
             - containerPort: 8081
