@@ -1,0 +1,26 @@
+controller:
+  replicaCount: 1
+  config:
+    use-proxy-protocol: "true"
+  tolerations:
+    - key: "CriticalAddonsOnly"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+  service:
+    type: LoadBalancer
+    targetPorts:
+      http: http
+      
+
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "external"
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+
+      # Backend Protocol
+      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+
+      # THE FIX: Modern AWS Load Balancer Controller proxy protocol annotation
+      service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: "proxy_protocol_v2.enabled=true"

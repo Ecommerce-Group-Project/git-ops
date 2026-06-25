@@ -1,0 +1,14 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: eks-todo-project
+  namespace: argocd
+spec:
+  description: "Project for the EKS Todo Application"
+  
+  sourceRepos:
+    - "https://github.com/Wicky2001/eks-todo.git"
+  
+  destinations:
+    - namespace: "app"
+      server: "https://kubernetes.default.svc"
