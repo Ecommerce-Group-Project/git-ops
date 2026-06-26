@@ -1,17 +1,8 @@
-apiVersion: karpenter.k8s.aws/v1
-kind: EC2NodeClass
+apiVersion: karpenter.azure.com/v1beta1
+kind: AKSNodeClass
 metadata:
   name: default
 spec:
-  amiFamily: AL2023
-  role: ${role_name}
-  amiSelectorTerms:
-    - alias: al2023@latest
-  subnetSelectorTerms:
-    - tags:
-        karpenter.sh/discovery: ${cluster_name}
-  securityGroupSelectorTerms:
-    - tags:
-        karpenter.sh/discovery: ${cluster_name}
-  tags:
-    karpenter.sh/discovery: ${cluster_name}
+  # Azure Linux is Microsoft's secure, container-optimized internal OS distro 
+  # This is the exact architectural equivalent to AWS AL2023.
+  imageFamily: AzureLinux

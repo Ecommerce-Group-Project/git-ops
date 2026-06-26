@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: notification-service
-  namespace: e-commerce
+  namespace: app
 spec:
   selector:
     app: notification-service
@@ -16,7 +16,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: notification-service-deployment
-  namespace: e-commerce
+  namespace: app
 spec:
   replicas: 1
   selector:

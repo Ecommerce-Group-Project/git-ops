@@ -11,21 +11,8 @@ variable "subscription_id" {
   type        = string
 }
 
-variable "tenant_id" {
-  description = "Microsoft Entra (Azure AD) Tenant ID"
-  type        = string
-}
 
-variable "client_id" {
-  description = "Service Principal Client ID"
-  type        = string
-}
 
-variable "client_secret" {
-  description = "Service Principal Client Secret"
-  type        = string
-  sensitive   = true
-}
 
 ###############################################################################
 # Resource Group

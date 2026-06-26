@@ -4,9 +4,9 @@ metadata:
   name: eks-todo-app
   namespace: argocd
 spec:
-  project: eks-todo-project
+  project: ep-group-project
   source:
-    repoURL: https://github.com/Wicky2001/eks-todo.git
+    repoURL: https://github.com/Ecommerce-Group-Project/git-ops.git
     targetRevision: main
     path: k8s/app
   destination:
@@ -16,5 +16,4 @@ spec:
     automated:
       prune: true
       selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
+  

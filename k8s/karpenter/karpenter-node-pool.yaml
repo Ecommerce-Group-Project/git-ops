@@ -6,61 +6,36 @@ spec:
   template:
     spec:
       nodeClassRef:
-        group: karpenter.k8s.aws
-        kind: EC2NodeClass
+        group: karpenter.azure.com
+        kind: AKSNodeClass
         name: default
 
       requirements:
         # ------------------------------------------------------------------
-        # INSTANCE CATEGORY FILTER
+        # INSTANCE CATEGORY FILTER (Burstable / Free-Tier Friendly)
         # ------------------------------------------------------------------
-        # This selects the "family" of EC2 instances.
-        # Example families: t (burstable), c (compute), r (memory)
-        #
-        # We use "t" because:
-        # - It is burstable (cheap)
-        # - Good for dev / low-cost workloads
-        # - Often eligible for Free Tier
-        #
-        # IMPORTANT: This does NOT mean "only t2 or t3"
-        # It means ANY instance family starting with "t"
+        # In AWS, burstable instances are the "t" family (t2, t3, etc.)
+        # In Azure, burstable instances are the "B" family (B2s, B1ms, etc.)
         # ------------------------------------------------------------------
-        - key: "karpenter.k8s.aws/instance-category"
+        - key: "karpenter.azure.com/sku-family"
           operator: In
-          values: ["t"]
+          values: ["B"]
 
         # ------------------------------------------------------------------
         # INSTANCE CPU FILTER
         # ------------------------------------------------------------------
-        # Controls how many vCPUs the instance can have
-        #
-        # We restrict it to small sizes:
-        # - 1 vCPU (very small)
-        # - 2 vCPU (micro / small instances)
-        #
-        # Why:
-        # Prevent Karpenter from choosing large expensive instances
-        # like t3.large, t3.xlarge, etc.
+        # Limits hardware sizes to 1 or 2 vCPUs to prevent runaway costs.
         # ------------------------------------------------------------------
-        - key: "karpenter.k8s.aws/instance-cpu"
+        - key: "karpenter.azure.com/sku-cpu"
           operator: In
           values: ["1", "2"]
 
         # ------------------------------------------------------------------
         # INSTANCE GENERATION FILTER
         # ------------------------------------------------------------------
-        # Controls how new the hardware generation must be
-        #
-        # Gte "2" means:
-        # - Allow generation 2 and above
-        # - Reject very old instance families (gen 1)
-        #
-        # Why:
-        # - Better performance
-        # - Better efficiency
-        # - Avoid outdated hardware
+        # Targets SKU version/generation 2 and newer.
         # ------------------------------------------------------------------
-        - key: "karpenter.k8s.aws/instance-generation"
+        - key: "karpenter.azure.com/sku-version"
           operator: Gte
           values: ["2"]
 
@@ -71,20 +46,11 @@ spec:
   # ----------------------------------------------------------------------
   # NODE CAPACITY LIMIT
   # ----------------------------------------------------------------------
-  # Maximum CPU Karpenter is allowed to provision in total
-  # (cluster-wide for this NodePool)
-  # ----------------------------------------------------------------------
   limits:
-    cpu: 1000
+    cpu: 20
 
   # ----------------------------------------------------------------------
-  # DISRUPTION SETTINGS (NODE CONSOLIDATION)
-  # ----------------------------------------------------------------------
-  # WhenEmpty:
-  # - Removes nodes only when they have no pods
-  #
-  # consolidateAfter: 30s
-  # - Waits 30 seconds before consolidating nodes
+  # DISRUPTION SETTINGS (FinOps Node Consolidation)
   # ----------------------------------------------------------------------
   disruption:
     consolidationPolicy: WhenEmpty

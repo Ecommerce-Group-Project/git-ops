@@ -1,7 +1,10 @@
 controller:
   replicaCount: 1
-  config:
-    use-proxy-protocol: "true"
+  
+  # REMOVED: use-proxy-protocol is removed because Azure Load Balancers 
+  # do not append proxy protocol v2 headers. Leaving it true will cause traffic to fail.
+  config: {}
+
   tolerations:
     - key: "CriticalAddonsOnly"
       operator: "Exists"
@@ -9,18 +12,16 @@ controller:
 
   service:
     type: LoadBalancer
+    
+    # THE AZURE FIX FOR REAL CLIENT IP:
+    # This prevents Kubernetes from performing SNAT on incoming traffic. 
+    # NGINX will now natively read the genuine client IP inside your logs and X-Forwarded-For headers.
+    externalTrafficPolicy: Local
+
     targetPorts:
       http: http
-      
 
-    annotations:
-      service.beta.kubernetes.io/aws-load-balancer-type: "external"
-      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
-      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
-
-      # Backend Protocol
-      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
-
-      # THE FIX: Modern AWS Load Balancer Controller proxy protocol annotation
-      service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: "proxy_protocol_v2.enabled=true"
+    # REMOVED: All service.beta.kubernetes.io/aws-* annotations are stripped.
+    # No annotations are required here because Azure AKS defaults to a public, 
+    # cross-zone, high-performance Internet-facing Load Balancer automatically!
+    annotations: {}

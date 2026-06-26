@@ -12,11 +12,11 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.0"
+      version = "~> 4.78.0"
     }
     helm = {
       source  = "hashicorp/helm"
-      version = "~> 2.12"
+      version = "~> 3.0"
     }
     kubectl = {
       source  = "gavinbunney/kubectl"
@@ -24,11 +24,12 @@ terraform {
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~> 2.25"
+      version = "~> 3.0.0"
     }
+
     http = {
       source  = "hashicorp/http"
-      version = "~> 3.4"
+      version = "~> 3.5.0"
     }
   }
 }
@@ -108,7 +109,7 @@ provider "kubernetes" {
 }
 
 provider "helm" {
-  kubernetes {
+  kubernetes = {
     host                   = azurerm_kubernetes_cluster.aks.kube_config.0.host
     client_certificate     = base64decode(azurerm_kubernetes_cluster.aks.kube_config.0.client_certificate)
     client_key             = base64decode(azurerm_kubernetes_cluster.aks.kube_config.0.client_key)
@@ -189,6 +190,15 @@ data "http" "argocd_manifest" {
   url = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
 }
 
+
+resource "kubectl_manifest" "argocd_secret" {
+  yaml_body          = file("${path.module}/../../k8s/argocd/secret.yaml")
+  override_namespace = "argocd"
+  server_side_apply  = true
+  force_conflicts    = true
+  depends_on         = [kubernetes_namespace_v1.argocd_namespace]
+}
+
 resource "kubectl_manifest" "argocd" {
   for_each = { for doc in split("---", data.http.argocd_manifest.response_body) :
     sha256(doc) => doc if trimspace(doc) != ""
@@ -198,7 +208,7 @@ resource "kubectl_manifest" "argocd" {
   override_namespace = "argocd"
   server_side_apply  = true
   force_conflicts    = true
-  depends_on         = [kubernetes_namespace_v1.argocd_namespace]
+  depends_on         = [kubernetes_namespace_v1.argocd_namespace, kubectl_manifest.argocd_secret]
 }
 
 # Patch ArgoCD server service to LoadBalancer (Updated for Azure CLI)
@@ -219,12 +229,12 @@ resource "terraform_data" "patch_argocd_service" {
 }
 
 resource "kubectl_manifest" "argocd_project" {
-  yaml_body  = file("${path.module}/../../k8s/argocd/argocd-project.yaml")
+  yaml_body  = file("${path.module}/../../k8s/argocd/project.yaml")
   depends_on = [kubernetes_namespace_v1.app_namespace, kubectl_manifest.argocd]
 }
 
 resource "kubectl_manifest" "argocd_application" {
-  yaml_body  = file("${path.module}/../../k8s/argocd/argocd-app.yaml")
+  yaml_body  = file("${path.module}/../../k8s/argocd/root-app.yaml")
   depends_on = [kubernetes_namespace_v1.app_namespace, kubectl_manifest.argocd_project]
 }
 
