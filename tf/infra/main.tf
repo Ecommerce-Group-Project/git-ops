@@ -42,6 +42,15 @@ provider "azurerm" {
   subscription_id = var.subscription_id
 }
 
+
+###############################################################################
+# Resource Group (Equivalent to AWS VPC)
+###############################################################################
+resource "azurerm_resource_group" "rg" {
+  name     = var.resource_group_name
+  location = var.location
+}
+
 ###############################################################################
 # Virtual Network (Equivalent to AWS VPC)
 ###############################################################################
@@ -49,15 +58,15 @@ provider "azurerm" {
 resource "azurerm_virtual_network" "vnet" {
   name                = "${var.cluster_name}-vnet"
   location            = var.location
-  resource_group_name = var.resource_group_name
+  resource_group_name = azurerm_resource_group.rg.name
   address_space       = ["10.0.0.0/16"]
 }
 
 resource "azurerm_subnet" "aks_subnet" {
   name                 = "${var.cluster_name}-subnet"
-  resource_group_name  = var.resource_group_name
+  resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = ["10.0.1.0/24"]
+  address_prefixes     = ["10.0.4.0/22"]
 }
 
 ###############################################################################
@@ -66,14 +75,14 @@ resource "azurerm_subnet" "aks_subnet" {
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = var.cluster_name
   location            = var.location
-  resource_group_name = var.resource_group_name
+  resource_group_name = azurerm_resource_group.rg.name
   dns_prefix          = var.cluster_name
-  kubernetes_version  = "1.30" # Standard current version
+  kubernetes_version  = "1.35.4" # Standard current version
 
   # The equivalent of EKS Managed Node Group (System Pool)
   default_node_pool {
     name           = "systempool"
-    node_count     = 3
+    node_count     = 1
     vm_size        = "Standard_D2s_v3" # Equivalent to t3.medium
     vnet_subnet_id = azurerm_subnet.aks_subnet.id
 
@@ -87,7 +96,9 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
   network_profile {
     network_plugin = "azure"
-    network_policy = "calico"
+    network_policy = "azure"
+    service_cidr   = "192.168.0.0/16"
+    dns_service_ip = "192.168.0.10"
   }
 
   # THIS REPLACES THE ENTIRE KARPENTER HELM CHART!
@@ -133,7 +144,7 @@ provider "kubectl" {
 resource "azurerm_container_registry" "acr" {
   # Name must be globally unique and alphanumeric only
   name                = replace("${var.project_name}registry", "-", "")
-  resource_group_name = var.resource_group_name
+  resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
   sku                 = "Standard"
   admin_enabled       = true
@@ -147,6 +158,29 @@ resource "azurerm_role_assignment" "aks_to_acr" {
   skip_service_principal_aad_check = true
 }
 
+
+
+###############################################################################
+# Karpenter NodePool equivalents (Applying standard YAML)
+###############################################################################
+
+
+resource "kubectl_manifest" "karpenter_node_class" {
+  yaml_body  = file("${path.module}/../../k8s/karpenter/karpenter-node-class.yaml")
+  depends_on = [azurerm_kubernetes_cluster.aks]
+}
+
+resource "kubectl_manifest" "karpenter_node_pool" {
+  yaml_body  = file("${path.module}/../../k8s/karpenter/karpenter-node-pool.yaml")
+  depends_on = [kubectl_manifest.karpenter_node_class]
+}
+
+# resource "kubectl_manifest" "inflate_deployment" {
+#   yaml_body  = file("${path.module}/../../k8s/inflate/inflate-deployment.yaml")
+#   depends_on = [kubectl_manifest.karpenter_node_pool]
+# }
+
+
 ###############################################################################
 # Ingress NGINX (Helm)
 ###############################################################################
@@ -158,20 +192,11 @@ resource "helm_release" "ingress-nginx" {
   create_namespace = true
   version          = "4.15.1"
   values           = [file("${path.module}/../../k8s/helm_config/helm-nginx-cofiguration.yaml")]
-}
 
-###############################################################################
-# Karpenter NodePool equivalents (Applying standard YAML)
-###############################################################################
-resource "kubectl_manifest" "karpenter_node_pool" {
-  yaml_body  = file("${path.module}/../../k8s/karpenter/karpenter-node-pool.yaml")
   depends_on = [azurerm_kubernetes_cluster.aks]
+
 }
 
-resource "kubectl_manifest" "inflate_deployment" {
-  yaml_body  = file("${path.module}/../../k8s/inflate/inflate-deployment.yaml")
-  depends_on = [kubectl_manifest.karpenter_node_pool]
-}
 
 ###############################################################################
 # ArgoCD Installation
@@ -186,10 +211,6 @@ resource "kubernetes_namespace_v1" "argocd_namespace" {
   depends_on = [azurerm_kubernetes_cluster.aks]
 }
 
-data "http" "argocd_manifest" {
-  url = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
-}
-
 
 resource "kubectl_manifest" "argocd_secret" {
   yaml_body          = file("${path.module}/../../k8s/argocd/secret.yaml")
@@ -199,10 +220,58 @@ resource "kubectl_manifest" "argocd_secret" {
   depends_on         = [kubernetes_namespace_v1.argocd_namespace]
 }
 
-resource "kubectl_manifest" "argocd" {
-  for_each = { for doc in split("---", data.http.argocd_manifest.response_body) :
-    sha256(doc) => doc if trimspace(doc) != ""
+# 1. Fetch the official manifest text
+data "http" "argocd_manifest" {
+  url = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
+}
+
+# 2. Decode, inject tolerations, and encode INSIDE the branches to avoid type panics
+locals {
+  raw_docs = [for doc in split("---", data.http.argocd_manifest.response_body) : trimspace(doc) if trimspace(doc) != ""]
+
+  # Convert documents to clean native maps
+  decoded_docs = [for doc_str in local.raw_docs : yamldecode(doc_str)]
+
+  # Build the resources map. Notice yamlencode() is now INSIDE both the true and false branches.
+  argocd_resources = {
+    for obj in local.decoded_docs :
+    "${lookup(obj, "kind", "Unknown")}/${try(obj.metadata.name, "Unknown")}" =>
+    contains(["Deployment", "StatefulSet"], lookup(obj, "kind", "")) ? yamlencode(
+      merge(
+        obj,
+        {
+          spec = merge(
+            obj.spec,
+            {
+              template = merge(
+                obj.spec.template,
+                {
+                  spec = merge(
+                    obj.spec.template.spec,
+                    {
+                      tolerations = [
+                        {
+                          key      = "CriticalAddonsOnly"
+                          operator = "Equal"
+                          value    = "true"
+                          effect   = "NoSchedule"
+                        }
+                      ]
+                    }
+                  )
+                }
+              )
+            }
+          )
+        }
+      )
+    ) : yamlencode(obj) # ◄ THE MAGIC FIX: Both sides now explicitly return a string!
   }
+}
+
+# 3. Apply the safely structured maps
+resource "kubectl_manifest" "argocd" {
+  for_each = local.argocd_resources
 
   yaml_body          = each.value
   override_namespace = "argocd"
@@ -211,6 +280,21 @@ resource "kubectl_manifest" "argocd" {
   depends_on         = [kubernetes_namespace_v1.argocd_namespace, kubectl_manifest.argocd_secret]
 }
 
+
+
+
+# resource "kubectl_manifest" "argocd" {
+#   for_each = { for doc in split("---", local.patched_argocd_manifest) :
+#     sha256(doc) => doc if trimspace(doc) != ""
+#   }
+
+#   yaml_body          = each.value
+#   override_namespace = "argocd"
+#   server_side_apply  = true
+#   force_conflicts    = true
+#   depends_on         = [kubernetes_namespace_v1.argocd_namespace, kubectl_manifest.argocd_secret]
+# }
+
 # Patch ArgoCD server service to LoadBalancer (Updated for Azure CLI)
 resource "terraform_data" "patch_argocd_service" {
   provisioner "local-exec" {
@@ -218,7 +302,7 @@ resource "terraform_data" "patch_argocd_service" {
 
     command = <<-EOT
       # Update kubeconfig using Azure CLI instead of AWS CLI
-      az aks get-credentials --resource-group ${var.resource_group_name} --name ${azurerm_kubernetes_cluster.aks.name} --overwrite-existing
+      az aks get-credentials --resource-group ${azurerm_resource_group.rg.name} --name ${azurerm_kubernetes_cluster.aks.name} --overwrite-existing
       
       Start-Sleep -Seconds 20
       

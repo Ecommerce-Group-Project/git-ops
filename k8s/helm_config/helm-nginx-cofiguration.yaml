@@ -7,8 +7,17 @@ controller:
 
   tolerations:
     - key: "CriticalAddonsOnly"
-      operator: "Exists"
+      operator: "Equal"
+      value: "true"
       effect: "NoSchedule"
+      
+  admissionWebhooks:
+    patch:
+      tolerations:
+        - key: "CriticalAddonsOnly"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
 
   service:
     type: LoadBalancer
