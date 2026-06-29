@@ -283,17 +283,6 @@ resource "kubectl_manifest" "argocd" {
 
 
 
-# resource "kubectl_manifest" "argocd" {
-#   for_each = { for doc in split("---", local.patched_argocd_manifest) :
-#     sha256(doc) => doc if trimspace(doc) != ""
-#   }
-
-#   yaml_body          = each.value
-#   override_namespace = "argocd"
-#   server_side_apply  = true
-#   force_conflicts    = true
-#   depends_on         = [kubernetes_namespace_v1.argocd_namespace, kubectl_manifest.argocd_secret]
-# }
 
 # Patch ArgoCD server service to LoadBalancer (Updated for Azure CLI)
 resource "terraform_data" "patch_argocd_service" {
@@ -344,4 +333,76 @@ resource "helm_release" "sealed_secrets" {
     })
   ]
   depends_on = [azurerm_kubernetes_cluster.aks]
+}
+
+
+
+
+###############################################################################
+# PostgreSQL Flexible Server (Equivalent to AWS RDS)
+###############################################################################
+
+# Private DNS Zone which map our db server dns name to the private endpoint IP address.(PRIVATE PHONE BOOK)
+resource "azurerm_private_dns_zone" "postgres_dns" {
+  name                = "privatelink.postgres.database.azure.com"
+  resource_group_name = azurerm_resource_group.rg.name
+}
+
+# Create a link between the Private DNS Zone and the VNet where AKS is deployed.(LINK BETWEEN PHONE BOOK AND VNET)
+resource "azurerm_private_dns_zone_virtual_network_link" "dns_link" {
+  name                  = "pg-dns-vnet-link"
+  resource_group_name   = azurerm_resource_group.rg.name
+  private_dns_zone_name = azurerm_private_dns_zone.postgres_dns.name
+  virtual_network_id    = azurerm_virtual_network.vnet.id
+}
+
+# 3. Create the Private Endpoint inside your active App/AKS subnet
+resource "azurerm_private_endpoint" "pg_private_endpoint" {
+  name                = "${var.project_name}-pg-endpoint"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  subnet_id           = azurerm_subnet.aks_subnet.id
+
+  /*
+
+  It tells the Private Endpoint exactly to which resource it should connect to. In this case, it's the PostgreSQL Flexible Server we created earlier. 
+  The subresource_names field specifies the type of resource we're connecting to, which is a PostgreSQL server in this case.
+  
+  */
+  private_service_connection {
+    name                           = "${var.project_name}-pg-privatelink"
+    private_connection_resource_id = azurerm_postgresql_flexible_server.dbserver.id
+    is_manual_connection           = false
+    subresource_names              = ["postgresqlServer"]
+  }
+
+
+  /*
+  When Private Endpoint spins up, it gets a dynamic private IP address from your subnet. This group acts like a receptionist that instantly 
+  writes that brand-new private IP address directly into your Private DNS Zone phonebook under your server's name.
+  */
+  private_dns_zone_group {
+    name                 = "pg-dns-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.postgres_dns.id]
+  }
+
+  depends_on = [azurerm_private_dns_zone_virtual_network_link.dns_link]
+}
+
+resource "azurerm_postgresql_flexible_server" "dbserver" {
+  name                          = "${var.project_name}-postgresql"
+  resource_group_name           = azurerm_resource_group.rg.name
+  location                      = azurerm_resource_group.rg.location
+  version                       = "18"
+  public_network_access_enabled = false
+  administrator_login           = var.administrator_username
+  administrator_password        = var.administrator_password
+  zone                          = "1"
+
+  storage_mb   = 32768
+  storage_tier = "P4"
+
+  sku_name   = "B_Standard_B1ms"
+  depends_on = [azurerm_private_dns_zone_virtual_network_link.dns_link]
+
 }

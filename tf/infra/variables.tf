@@ -38,9 +38,10 @@ variable "project_name" {
 ###############################################################################
 # Database (Azure Database for PostgreSQL/MySQL)
 ###############################################################################
-variable "administrator_login" {
+variable "administrator_username" {
   description = "Database administrator username"
   type        = string
+  sensitive   = true
 }
 
 variable "administrator_password" {

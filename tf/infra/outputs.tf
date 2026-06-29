@@ -66,3 +66,42 @@ output "argocd_admin_password_command" {
   description = "Convenience command to fetch and decode the auto-generated initial ArgoCD admin password token."
   value       = "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}'"
 }
+
+
+###############################################################################
+# PostgreSQL Server Infrastructure Outputs
+###############################################################################
+
+output "postgresql_server_id" {
+  description = "The full Azure Resource Manager ID of the PostgreSQL server instance."
+  value       = azurerm_postgresql_flexible_server.dbserver.id
+}
+
+output "postgresql_server_name" {
+  description = "The specific server name chosen for the PostgreSQL deployment."
+  value       = azurerm_postgresql_flexible_server.dbserver.name
+}
+
+output "postgresql_fqdn" {
+  description = "The fully qualified domain name (FQDN) of the PostgreSQL server. Use this string as your host endpoint inside application connection properties."
+  value       = azurerm_postgresql_flexible_server.dbserver.fqdn
+}
+
+output "postgresql_admin_username" {
+  description = "The master administrator login username required to connect to the database engine."
+  value       = azurerm_postgresql_flexible_server.dbserver.administrator_login
+}
+
+###############################################################################
+# Private Link & Endpoint Networking Outputs
+###############################################################################
+
+output "postgresql_private_ip" {
+  description = "The internal private IP address allocated dynamically from your AKS subnet. Use this exact value inside your Kubernetes NetworkPolicy blocks to control egress traffic paths."
+  value       = azurerm_private_endpoint.pg_private_endpoint.private_service_connection[0].private_ip_address
+}
+
+output "private_endpoint_id" {
+  description = "The unique identification tracking key for the generated virtual network interface card."
+  value       = azurerm_private_endpoint.pg_private_endpoint.id
+}
