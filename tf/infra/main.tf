@@ -220,19 +220,16 @@ resource "kubectl_manifest" "argocd_secret" {
   depends_on         = [kubernetes_namespace_v1.argocd_namespace]
 }
 
-# 1. Fetch the official manifest text
+
 data "http" "argocd_manifest" {
   url = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
 }
 
-# 2. Decode, inject tolerations, and encode INSIDE the branches to avoid type panics
 locals {
   raw_docs = [for doc in split("---", data.http.argocd_manifest.response_body) : trimspace(doc) if trimspace(doc) != ""]
 
-  # Convert documents to clean native maps
   decoded_docs = [for doc_str in local.raw_docs : yamldecode(doc_str)]
 
-  # Build the resources map. Notice yamlencode() is now INSIDE both the true and false branches.
   argocd_resources = {
     for obj in local.decoded_docs :
     "${lookup(obj, "kind", "Unknown")}/${try(obj.metadata.name, "Unknown")}" =>
@@ -265,11 +262,10 @@ locals {
           )
         }
       )
-    ) : yamlencode(obj) # ◄ THE MAGIC FIX: Both sides now explicitly return a string!
+    ) : yamlencode(obj)
   }
 }
 
-# 3. Apply the safely structured maps
 resource "kubectl_manifest" "argocd" {
   for_each = local.argocd_resources
 
@@ -279,9 +275,6 @@ resource "kubectl_manifest" "argocd" {
   force_conflicts    = true
   depends_on         = [kubernetes_namespace_v1.argocd_namespace, kubectl_manifest.argocd_secret]
 }
-
-
-
 
 
 # Patch ArgoCD server service to LoadBalancer (Updated for Azure CLI)
@@ -390,14 +383,13 @@ resource "azurerm_private_endpoint" "pg_private_endpoint" {
 }
 
 resource "azurerm_postgresql_flexible_server" "dbserver" {
-  name                          = "${var.project_name}-postgresql"
+  name                          = "${var.project_name}-postgresql-server"
   resource_group_name           = azurerm_resource_group.rg.name
-  location                      = azurerm_resource_group.rg.location
-  version                       = "18"
+  location                      = "East Asia"
+  version                       = "16"
   public_network_access_enabled = false
   administrator_login           = var.administrator_username
   administrator_password        = var.administrator_password
-  zone                          = "1"
 
   storage_mb   = 32768
   storage_tier = "P4"

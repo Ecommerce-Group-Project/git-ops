@@ -1,19 +1,22 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: eks-todo-app
+  name: root-bootstrap-app
   namespace: argocd
 spec:
   project: ep-group-project
+
   source:
     repoURL: https://github.com/Ecommerce-Group-Project/git-ops.git
     targetRevision: main
-    path: k8s/app
+    path: k8s/argocd/child_apps 
+  
   destination:
     server: https://kubernetes.default.svc
-    namespace: app
+    namespace: argocd 
+
   syncPolicy:
     automated:
-      prune: true
-      selfHeal: true
-  
+      prune: true      
+      selfHeal: true   
+   

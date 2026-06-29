@@ -90,6 +90,7 @@ output "postgresql_fqdn" {
 output "postgresql_admin_username" {
   description = "The master administrator login username required to connect to the database engine."
   value       = azurerm_postgresql_flexible_server.dbserver.administrator_login
+  sensitive   = true # Marked sensitive to prevent raw passwords from leaking in standard console printouts
 }
 
 ###############################################################################

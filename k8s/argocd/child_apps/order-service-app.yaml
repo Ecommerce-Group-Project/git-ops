@@ -1,17 +1,17 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: ecommerce-notification-service
+  name: ecommerce-order-service
   namespace: argocd
 spec:
   project: ep-group-project
   source:
     repoURL: https://github.com/Ecommerce-Group-Project/git-ops.git
     targetRevision: main
-    path: k8s/notfication_service # ◄ Points to your notification manifests
+    path: k8s/order_service 
   destination:
     server: https://kubernetes.default.svc
-    namespace: app # ◄ Deploys into your shared 'app' namespace
+    namespace: app 
   syncPolicy:
     automated:
       prune: true
