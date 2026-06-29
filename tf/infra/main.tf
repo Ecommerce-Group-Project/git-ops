@@ -385,7 +385,7 @@ resource "azurerm_private_endpoint" "pg_private_endpoint" {
 resource "azurerm_postgresql_flexible_server" "dbserver" {
   name                          = "${var.project_name}-postgresql-server"
   resource_group_name           = azurerm_resource_group.rg.name
-  location                      = "East Asia"
+  location                      = var.location
   version                       = "16"
   public_network_access_enabled = false
   administrator_login           = var.administrator_username

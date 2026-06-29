@@ -35,9 +35,9 @@ spec:
         # ------------------------------------------------------------------
         # Targets SKU version/generation 2 and newer.
         # ------------------------------------------------------------------
-        - key: "karpenter.azure.com/sku-version"
-          operator: Gte
-          values: ["2"]
+        # - key: "karpenter.azure.com/sku-version"
+        #   operator: Gte
+        #   values: ["1"]
 
         - key: kubernetes.io/arch
           operator: In

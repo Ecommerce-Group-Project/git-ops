@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pg-bastion
+  namespace: app 
+spec:
+  containers:
+  - name: postgres-client
+    image: postgres:16-alpine
+    command: ["sleep", "infinity"]
+  restartPolicy: Always

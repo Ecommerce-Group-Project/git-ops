@@ -3,6 +3,4 @@ kind: AKSNodeClass
 metadata:
   name: default
 spec:
-  # Azure Linux is Microsoft's secure, container-optimized internal OS distro 
-  # This is the exact architectural equivalent to AWS AL2023.
   imageFamily: AzureLinux
