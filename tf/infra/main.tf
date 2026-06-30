@@ -38,7 +38,11 @@ terraform {
 # Provider Configuration
 ###############################################################################
 provider "azurerm" {
-  features {}
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
   subscription_id = var.subscription_id
 }
 
@@ -108,6 +112,17 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 }
 
+
+
+
+resource "azurerm_role_assignment" "karpenter_network_access" {
+  scope                = azurerm_subnet.aks_subnet.id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_kubernetes_cluster.aks.identity[0].principal_id
+
+  depends_on = [azurerm_kubernetes_cluster.aks]
+}
+
 ###############################################################################
 # Kubernetes Auth Providers (Dynamic Login)
 ###############################################################################
@@ -166,8 +181,10 @@ resource "azurerm_role_assignment" "aks_to_acr" {
 
 
 resource "kubectl_manifest" "karpenter_node_class" {
-  yaml_body  = file("${path.module}/../../k8s/karpenter/karpenter-node-class.yaml")
-  depends_on = [azurerm_kubernetes_cluster.aks]
+  yaml_body = templatefile("${path.module}/../../k8s/karpenter/karpenter-node-class.yaml", {
+    subnet_id = "${azurerm_subnet.aks_subnet.id}"
+  })
+  depends_on = [azurerm_kubernetes_cluster.aks, azurerm_role_assignment.karpenter_network_access]
 }
 
 resource "kubectl_manifest" "karpenter_node_pool" {
@@ -393,6 +410,7 @@ resource "azurerm_postgresql_flexible_server" "dbserver" {
 
   storage_mb   = 32768
   storage_tier = "P4"
+  zone         = "1"
 
   sku_name   = "B_Standard_B1ms"
   depends_on = [azurerm_private_dns_zone_virtual_network_link.dns_link]

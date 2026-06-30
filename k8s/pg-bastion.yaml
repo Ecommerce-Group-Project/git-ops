@@ -8,4 +8,11 @@ spec:
   - name: postgres-client
     image: postgres:16-alpine
     command: ["sleep", "infinity"]
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
   restartPolicy: Always
