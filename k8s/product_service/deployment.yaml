@@ -16,7 +16,6 @@ spec:
       containers:
         - name: product-service-container
           image: wicky2001/product_service:4db2371b0ee98a0c95db9430a2188a32f4ec86d9
-          image: wicky2001/product_service:4db2371b0ee98a0c95db9430a2188a32f4ec86d9
           imagePullPolicy: Always
           ports:
             - containerPort: 8081

@@ -16,7 +16,6 @@ spec:
       containers:
         - name: order-service-container
           image: wicky2001/order_service:051431f43d40fb945f15c6efdf7d1af2ef7ff011
-          image: wicky2001/order_service:051431f43d40fb945f15c6efdf7d1af2ef7ff011
           imagePullPolicy: Always
           ports:
             - containerPort: 8082
