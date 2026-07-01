@@ -11,6 +11,10 @@ spec:
     - protocol: TCP
       port: 8082
       targetPort: 8082
+  template:
+    spec:
+      containers:
+        - image: wicky2001/order_service:467c60f245d21f1df26d91c923dc23eefceb5286
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -29,7 +33,7 @@ spec:
     spec:
       containers:
         - name: order-service-container
-          image: enterprisegroupprojectregistry.azurecr.io/order-service:latest
+          image: wicky2001/order_service:467c60f245d21f1df26d91c923dc23eefceb5286
           imagePullPolicy: Always
           ports:
             - containerPort: 8082
