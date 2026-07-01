@@ -14,7 +14,7 @@ spec:
   template:
     spec:
       containers:
-        - image: wicky2001/order_service:467c60f245d21f1df26d91c923dc23eefceb5286
+        - image: wicky2001/order_service:8959376cc9b4e4d4a356db805b88928e0c46f889
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
         - name: order-service-container
-          image: wicky2001/order_service:467c60f245d21f1df26d91c923dc23eefceb5286
+          image: wicky2001/order_service:8959376cc9b4e4d4a356db805b88928e0c46f889
           imagePullPolicy: Always
           ports:
             - containerPort: 8082
